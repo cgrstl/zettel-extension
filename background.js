@@ -13,7 +13,7 @@ function scrapePageWithReadability() {
 // Lauscht auf Klicks auf das Erweiterungs-Icon
 chrome.action.onClicked.addListener(async (tab) => {
   // Ignoriere interne Chrome-Seiten
-  if (tab.url.startsWith('chrome://')) {
+  if (tab.url.startsWith('chrome://') || tab.url.startsWith('edge://')) {
     console.log("Aktion auf interner Seite ignoriert.");
     return;
   }
@@ -41,6 +41,13 @@ chrome.action.onClicked.addListener(async (tab) => {
         target: { tabId: tab.id },
         function: scrapePageWithReadability,
       });
+
+      // --- NEUE FEHLERPRÜFUNG HINZUGEFÜGT ---
+      if (!results || !results[0] || !results[0].result) {
+        console.error("Konnte keinen Inhalt von der Seite extrahieren. Das Skript gab kein Ergebnis zurück.");
+        return; // Breche die Ausführung hier ab, um weitere Fehler zu vermeiden
+      }
+      // -----------------------------------------
 
       const article = results[0].result;
       const data = {
