@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Zettel Knowledge Hub",
+  "version": "1.1",
+  "description": "Sendet den sauberen Inhalt der aktuellen Seite an den Zettel-Server.",
+
+  "permissions": ["activeTab", "scripting"],
+
+  "background": {
+    "scripts": ["browser-polyfill.js", "background.js"],
+    "type": "module"
+  },
+
+  "action": {
+    "default_title": "An Knowledge Hub senden",
+    "default_icon": {
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+
+  "web_accessible_resources": [{
+    "resources": ["Readability.js"],
+    "matches": ["<all_urls>"]
+  }]
+}
