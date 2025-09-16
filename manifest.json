@@ -7,7 +7,7 @@
   "permissions": ["activeTab", "scripting"],
 
   "background": {
-    "scripts": ["browser-polyfill.js", "background.js"],
+    "service_worker": "background.js",
     "type": "module"
   },
 
