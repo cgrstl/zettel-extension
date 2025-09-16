@@ -1,11 +1,9 @@
-import './browser-polyfill.js';
-
 const SERVER_URL = 'http://127.0.0.1:8080';
 
 // Funktion zum Extrahieren des sauberen Artikel-Textes
 function scrapePageWithReadability() {
-  const documentClone = document.cloneNode(true);
-  const article = new Readability(documentClone).parse();
+  // Readability wird über `executeScript` in die Seite geladen und ist hier global verfügbar
+  const article = new Readability(document.cloneNode(true)).parse();
   return {
     title: article.title,
     content: article.textContent
@@ -13,8 +11,9 @@ function scrapePageWithReadability() {
 }
 
 // Lauscht auf Klicks auf das Erweiterungs-Icon
-browser.action.onClicked.addListener(async (tab) => {
-  if (tab.url.startsWith('about:') || tab.url.startsWith('chrome:')) {
+chrome.action.onClicked.addListener(async (tab) => {
+  // Ignoriere interne Chrome-Seiten
+  if (tab.url.startsWith('chrome://')) {
     console.log("Aktion auf interner Seite ignoriert.");
     return;
   }
@@ -33,12 +32,12 @@ browser.action.onClicked.addListener(async (tab) => {
     // Fall 2: Es ist eine normale Webseite
     } else {
       console.log("Webseite erkannt. Extrahiere Artikel mit Readability...");
-      await browser.scripting.executeScript({
+      await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         files: ['Readability.js'],
       });
       
-      const results = await browser.scripting.executeScript({
+      const results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         function: scrapePageWithReadability,
       });
