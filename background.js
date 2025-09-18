@@ -1,6 +1,6 @@
 const SERVER_URL = 'http://127.0.0.1:8080';
 
-// Funktion zum Extrahieren des sauberen Artikel-Textes
+// Function to extract clean article text from a web page
 function scrapePageWithReadability() {
   const article = new Readability(document.cloneNode(true)).parse();
   return {
@@ -9,60 +9,67 @@ function scrapePageWithReadability() {
   };
 }
 
-// Lauscht auf Klicks auf das Erweiterungs-Icon
+// Main logic that runs when the extension icon is clicked
 chrome.action.onClicked.addListener(async (tab) => {
-  if (tab.url.startsWith('chrome://')) {
-    console.log("Aktion auf interner Seite ignoriert.");
+  if (!tab.url || tab.url.startsWith('chrome://')) {
+    console.log("Action ignored on internal Chrome pages.");
     return;
   }
 
-  try {
-    // --- HIER IST DIE VERBESSERTE LOGIK ---
-    // Wir nehmen nur den Teil der URL vor einem eventuellen '?'
-    const mainUrlPart = tab.url.split('?')[0];
-    if (mainUrlPart.toLowerCase().endsWith('.pdf')) {
-    // -----------------------------------------
-      console.log("PDF erkannt. Sende URL an /ingest-pdf...");
-      await fetch(`${SERVER_URL}/ingest-pdf`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        // Wir senden die komplette, originale URL
-        body: JSON.stringify({ url: tab.url }),
-      });
-      console.log("PDF-URL erfolgreich gesendet.");
+  console.log(`Processing URL: ${tab.url}`);
+  let dataToSend = {
+    url: tab.url,
+    title: tab.title, // Default title
+    content: "" // Default empty content
+  };
 
-    } else {
-      console.log("Webseite erkannt. Extrahiere Artikel mit Readability...");
+  try {
+    const mainUrlPart = tab.url.split('?')[0].toLowerCase();
+
+    // Case 1: It's a regular web page, not a PDF
+    if (!mainUrlPart.endsWith('.pdf')) {
+      console.log("Web page detected. Extracting article with Readability...");
+      
+      // Inject the Readability script into the page
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         files: ['Readability.js'],
       });
       
+      // Execute our scraping function on the page
       const results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         function: scrapePageWithReadability,
       });
 
-      if (!results || !results[0] || !results[0].result) {
-        console.error("Konnte keinen Inhalt von der Seite extrahieren.");
-        return;
+      // Update data with the extracted content
+      if (results && results[0] && results[0].result) {
+        const article = results[0].result;
+        dataToSend.title = article.title || tab.title;
+        dataToSend.content = article.content || "";
       }
+    } else {
+        // Case 2: It's a PDF. We only need to send the URL and Title.
+        // The backend will handle downloading and text extraction.
+        console.log("PDF detected. Sending URL for backend processing.");
+    }
 
-      const article = results[0].result;
-      const data = {
-        url: tab.url,
-        title: article.title || "Kein Titel gefunden",
-        content: article.content || "Kein Inhalt extrahierbar."
-      };
-
-      await fetch(`${SERVER_URL}/ingest-web`, {
+    // --- Unified Fetch Call to the Single /ingest Endpoint ---
+    console.log(`Sending data for "${dataToSend.title}" to the backend...`);
+    const response = await fetch(`${SERVER_URL}/ingest`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      console.log(`Artikel "${data.title}" erfolgreich gesendet.`);
+        body: JSON.stringify(dataToSend),
+    });
+    
+    const result = await response.json();
+    if (response.ok) {
+        console.log("Successfully ingested:", result.message);
+    } else {
+        console.error("Ingestion failed:", result.message);
     }
+
   } catch (error) {
-    console.error("Fehler in der Zettel-Erweiterung:", error);
+    console.error("An error occurred in the extension:", error);
   }
 });
